@@ -1,89 +1,119 @@
-#include <unistd.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/time.h>
-#include <time.h>
+#include "philosopher.h"
+#include "util.h"
 
-static const long long REFLESH_TIME_INTERVAL = 3600000000;
-static long long	number_of_philosophers = 4;
-static long long	time_to_die = 500000;
-static long long	time_to_eat = 2000;
-static long long	time_to_sleep = 1000;
-pthread_mutex_t		mutex_test[4];
-long long			last_meal[4];
-long long			current_time[4];
-
-void		*eatNsleep(void *num)
+void		fillup_phil(t_arg arg, t_mtx *mtx, t_phil *phil)
 {
-	long long		my_number;
-	long long		left;
-	long long		right;
- 
-	my_number = *(long long *)(num);
-	left = (!my_number) ? number_of_philosophers : my_number - 1;
-	right = (my_number + 1 >= number_of_philosophers) ? 0 : my_number + 1;
-	while (current_time[my_number] - last_meal[my_number] < time_to_die)
+	long int idx;
+	
+	idx = 0;
+	while (idx < arg.number_of_phil)
 	{
-		pthread_mutex_lock(&(mutex_test[left]));
-		printf("%lld is waiting\n", my_number);
-		pthread_mutex_lock(&(mutex_test[right]));
-		printf("%lld start eating\n", my_number);
-		usleep(time_to_eat);
-		last_meal[my_number] = current_time[my_number];
-		pthread_mutex_unlock(&(mutex_test[left]));
-		pthread_mutex_unlock(&(mutex_test[right]));
-
-		printf("%lld sleep\n", my_number);
-		usleep(time_to_sleep);
-		printf("%lld thinking\n", my_number);
+		phil[idx].my_number = idx + 1;
+		phil[idx].time_to_die = arg.time_to_die;
+		phil[idx].time_to_eat = arg.time_to_eat;
+		phil[idx].time_to_sleep = arg.time_to_sleep;
+		phil[idx].must_eat = arg.must_eat;
+		if (!idx)
+			phil[idx].left = &(mtx[arg.number_of_phil - 1].stick);
+		else
+			phil[idx].left = &(mtx[idx - 1].stick);
+		phil[idx].right = &(mtx[idx].stick);
+		phil[idx].last_meal = 0;
+		idx++;
 	}
-	return (num);
 }
 
-void		*philosopher(void *num)
+int			launch_philosophers(t_arg arg, t_mtx *mtx, t_phil *phil)
 {
-	struct timeval	mytime;
-	pthread_t		hand;
-	long long		my_number;
-
-	my_number = *(long long *)(num);
-	printf("%lld\n", my_number);
-	gettimeofday(&mytime, NULL);
-	current_time[my_number] = mytime.tv_usec;
-	last_meal[my_number] = current_time[my_number];
-	pthread_create(&hand, NULL, eatNsleep, num);
-	pthread_detach(hand);
-	while (current_time[my_number] - last_meal[my_number] < time_to_die)
+	long int idx;
+	
+	idx = 0;
+	fillup_phil(arg, mtx, phil);
+	while (idx < arg.number_of_phil)
 	{
-		gettimeofday(&mytime, NULL);
-		if (mytime.tv_usec > REFLESH_TIME_INTERVAL)
-		{
-			mytime.tv_usec -= REFLESH_TIME_INTERVAL;
-			settimeofday(&mytime, NULL);
-			last_meal[my_number] -= REFLESH_TIME_INTERVAL;
-		}
-		current_time[my_number] = mytime.tv_usec;
+		if (pthread_create(&(mtx[idx].philosopher), NULL, doPhilosopher, (void *)(phil + idx)))
+			return (3);
+		idx += 2;
 	}
-	printf("%lld died\n", my_number);
-	return (num);
+	idx = 1;
+	while (idx < arg.number_of_phil)
+	{
+		if (pthread_create(&(mtx[idx].philosopher), NULL, doPhilosopher, (void *)(phil + idx)))
+			return (3);
+		idx += 2;
+	}
+	idx = 0;
+	while (idx < arg.number_of_phil)
+	{
+		if (pthread_join(mtx[idx].philosopher, NULL))
+			return (3);
+		idx++;
+	}
+	free(phil);
+	free(mtx);
+	return (0);
 }
 
-int			main(void)
+t_arg		extract_arg(char **argv, int option_flag)
 {
-	pthread_t	ppl[number_of_philosophers];
-	long long	i;
+	t_arg	arg;
 
-	i = 0;
-	while (i < number_of_philosophers)
+	arg.number_of_phil = check_digit(argv[1]);
+	arg.time_to_die = check_digit(argv[2]) * 1000;
+	arg.time_to_eat = check_digit(argv[3]) * 1000;
+	arg.time_to_sleep = check_digit(argv[4]) * 1000;
+	if (arg.time_to_die < 0 || arg.time_to_eat < 0 || arg.time_to_sleep < 0)
+		arg.number_of_phil = -1;
+	if (option_flag)
 	{
-		pthread_create(&(ppl[i]), NULL, philosopher, (void *)(& i));
-		i++;
+		arg.must_eat = check_digit(argv[5]);
+		if (arg.must_eat < 0)
+			arg.number_of_phil = -1;
 	}
-	i = 0;
-	while (i++ < number_of_philosophers)
+	else
+		arg.must_eat = -1;
+	return (arg);
+}
+
+t_mtx		*init_mtx(long int number_of_phil)
+{
+	t_mtx	*mtx;
+	long int idx;
+
+	if (!(mtx = (t_mtx *)malloc(sizeof(t_mtx) * number_of_phil)))
+		return (0);
+	idx = 0;
+	while (idx < number_of_phil)
 	{
-		pthread_join(ppl[i], NULL);
+		pthread_mutex_init(&(mtx[idx].stick), NULL);
+		idx++;
+	}
+	return (mtx);
+}
+
+int			main(int argc, char **argv)
+{
+	t_arg			 	arg;
+	t_mtx				*mtx;
+	t_phil				*phil;
+
+	if (argc != 5 && argc != 6)
+		return (1); //wrong number of argments
+	arg = extract_arg(argv, argc == 6);
+	if (arg.number_of_phil < 2)
+		return (1); //wrong argments
+	if (!(mtx = init_mtx(arg.number_of_phil)))
+		return (2); //malloc fail
+	if (!(phil = (t_phil *)malloc(sizeof(t_phil) * arg.number_of_phil)))
+	{
+		free(mtx);
+		return (2); //malloc fail
+	}
+	if ((launch_philosophers(arg, mtx, phil)))
+	{
+		free(mtx);
+		free(phil);
+		return (3); //pthread fail
 	}
 	return (0);
 }
