@@ -1,5 +1,5 @@
 #include "philosopher.h"
-#include "util.h"
+#include "philosopher_util.h"
 
 void		fillup_phil(t_arg arg, t_mtx *mtx, t_phil *phil)
 {

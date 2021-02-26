@@ -1,5 +1,5 @@
 #include "philosopher.h"
-#include "util.h"
+#include "philosopher_util.h"
 
 static int    takeFork(t_phil *phil)
 {

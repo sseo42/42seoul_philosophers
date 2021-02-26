@@ -1,5 +1,5 @@
-#ifndef UTIL_H
-# define UTIL_L
+#ifndef PHILOSOPHER_UTIL_H
+# define PHILOSOPHER_UTIL_L
 
 # include <unistd.h>
 # include <sys/time.h>
