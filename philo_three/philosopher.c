@@ -6,7 +6,7 @@
 /*   By: sseo <marvin@42.fr>                        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/03/01 00:15:24 by sseo              #+#    #+#             */
-/*   Updated: 2021/03/01 01:08:06 by sseo             ###   ########.fr       */
+/*   Updated: 2021/03/01 01:22:27 by sseo             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,7 +34,7 @@ static int		take_stick(t_phil *phil)
 	return (0);
 }
 
-static int		drop_stick(t_phil *phil)
+static int		drop_stick(void)
 {
 	sem_post(g_sema);
 	sem_post(g_sema);
@@ -50,11 +50,11 @@ static int		eat_sleep(t_phil *phil)
 		if (take_stick(phil))
 			return (0);
 		if (get_usec() - phil->last_meal > phil->time_to_die)
-			return (drop_stick(phil));
+			return (drop_stick());
 		phil->last_meal = get_usec();
 		print_status(get_usec(), phil->my_number, "is eating\n");
 		usleep(phil->time_to_eat);
-		drop_stick(phil);
+		drop_stick();
 		if (get_usec() - phil->last_meal > phil->time_to_die)
 			return (0);
 		if (phil->must_eat > 0 && --(phil->must_eat) == 0)

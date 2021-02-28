@@ -6,7 +6,7 @@
 /*   By: sseo <marvin@42.fr>                        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/03/01 00:08:38 by sseo              #+#    #+#             */
-/*   Updated: 2021/03/01 00:48:54 by sseo             ###   ########.fr       */
+/*   Updated: 2021/03/01 01:23:09 by sseo             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,7 +15,7 @@
 
 extern sem_t	*g_last_word;
 
-static void		fillup_phil(t_arg arg, t_mtx *mtx, t_phil *phil)
+static void		fillup_phil(t_arg arg, t_phil *phil)
 {
 	long int	idx;
 
@@ -37,7 +37,7 @@ int				launch_philosophers(t_arg arg, t_mtx *mtx, t_phil *phil)
 	pid_t		pid_num;
 
 	idx = 0;
-	fillup_phil(arg, mtx, phil);
+	fillup_phil(arg, phil);
 	while (idx < arg.number_of_phil)
 	{
 		if ((pid_num = fork()) == 0)
