@@ -5,14 +5,14 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: sseo <marvin@42.fr>                        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2021/02/28 16:29:22 by sseo              #+#    #+#             */
-/*   Updated: 2021/02/28 16:35:40 by sseo             ###   ########.fr       */
+/*   Created: 2021/02/28 16:56:28 by sseo              #+#    #+#             */
+/*   Updated: 2021/03/01 00:21:27 by sseo             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "philosopher.h"
 
-extern pthread_mutex_t	g_peer_check;
+extern sem_t	*g_peer_check;
 
 static void		fillup_phil(t_arg arg, t_mtx *mtx, t_phil *phil)
 {
@@ -26,11 +26,6 @@ static void		fillup_phil(t_arg arg, t_mtx *mtx, t_phil *phil)
 		phil[idx].time_to_eat = arg.time_to_eat;
 		phil[idx].time_to_sleep = arg.time_to_sleep;
 		phil[idx].must_eat = arg.must_eat;
-		if (!idx)
-			phil[idx].left = &(mtx[arg.number_of_phil - 1].stick);
-		else
-			phil[idx].left = &(mtx[idx - 1].stick);
-		phil[idx].right = &(mtx[idx].stick);
 		if (!idx)
 			phil[idx].left_status = &(mtx[arg.number_of_phil - 1].status);
 		else
@@ -51,8 +46,8 @@ int				launch_philosophers(t_arg arg, t_mtx *mtx, t_phil *phil)
 	fillup_phil(arg, mtx, phil);
 	while (idx < arg.number_of_phil)
 	{
-		if (pthread_create(&(mtx[idx].philosopher), NULL, \
-					do_philosopher, (void *)(phil + idx)))
+		if (pthread_create(&(mtx[idx].philosopher), NULL, do_philosopher, \
+					(void *)(phil + idx)))
 			return (3);
 		idx++;
 	}
@@ -73,7 +68,7 @@ void			check_peer(t_phil *phil)
 	int			min_state;
 	int			max_state;
 
-	pthread_mutex_lock(&g_peer_check);
+	sem_wait(g_peer_check);
 	max_state = (*(phil->left_status) > *(phil->right_status)) ? \
 				*(phil->left_status) : *(phil->right_status);
 	min_state = (*(phil->left_status) < *(phil->right_status)) ? \
@@ -81,9 +76,9 @@ void			check_peer(t_phil *phil)
 	if (*phil->my_status == SATISFIED)
 	{
 		if ((*(phil->left_status) == SATISFIED || \
-					*(phil->left_status) == WAITING) && \
+				*(phil->left_status) == WAITING) && \
 			(*(phil->right_status) == SATISFIED || \
-					*(phil->right_status) == WAITING))
+				*(phil->right_status) == WAITING))
 			*phil->my_status = EATING;
 		else if (max_state == SATISFIED)
 			*phil->my_status = min_state + 1;
@@ -93,5 +88,5 @@ void			check_peer(t_phil *phil)
 		if (*phil->my_status < max_state)
 			*phil->my_status = EATING;
 	}
-	pthread_mutex_unlock(&g_peer_check);
+	sem_post(g_peer_check);
 }

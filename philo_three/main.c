@@ -5,19 +5,20 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: sseo <marvin@42.fr>                        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2021/02/28 16:00:51 by sseo              #+#    #+#             */
-/*   Updated: 2021/02/28 16:00:52 by sseo             ###   ########.fr       */
+/*   Created: 2021/02/28 17:16:14 by sseo              #+#    #+#             */
+/*   Updated: 2021/03/01 01:10:38 by sseo             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "philosopher.h"
 #include "philosopher_func.h"
 
-int				g_someone_dead;
-pthread_mutex_t	g_death_check;
-pthread_mutex_t	g_peer_check;
+sem_t			*g_peer_check;
+sem_t			*g_death_check;
+sem_t			*g_sema;
+sem_t			*g_last_word;
 
-t_arg		extract_arg(char **argv, int option_flag)
+t_arg			extract_arg(char **argv, int option_flag)
 {
 	t_arg		arg;
 
@@ -38,32 +39,41 @@ t_arg		extract_arg(char **argv, int option_flag)
 	return (arg);
 }
 
-t_mtx		*init_mtx(long int number_of_phil)
+t_mtx			*init_mtx(long int num_of_phil)
 {
 	t_mtx		*mtx;
 	long int	idx;
 
-	if (!(mtx = (t_mtx *)malloc(sizeof(t_mtx) * number_of_phil)))
+	sem_unlink(".Pl");
+	sem_unlink(".Pl_dead");
+	sem_unlink(".Pl_peer");
+	sem_unlink(".Pl_last");
+	if ((g_sema = sem_open(".Pl", O_CREAT, 0644, num_of_phil)) == SEM_FAILED)
+		return (0);
+	if ((g_death_check = sem_open(".Pl_dead", O_CREAT, 0644, 1)) == SEM_FAILED)
+		return (0);
+	if ((g_peer_check = sem_open(".Pl_peer", O_CREAT, 0644, 1)) == SEM_FAILED)
+		return (0);
+	if ((g_last_word = sem_open(".Pl_last", O_CREAT, 0644, 1)) == SEM_FAILED)
+		return (0);
+	if (!(mtx = (t_mtx *)malloc(sizeof(t_mtx) * num_of_phil)))
 		return (0);
 	idx = 0;
-	while (idx < number_of_phil)
+	while (idx < num_of_phil)
 	{
-		pthread_mutex_init(&(mtx[idx].stick), NULL);
 		mtx[idx].status = SATISFIED;
 		idx++;
 	}
-	pthread_mutex_init(&g_death_check, NULL);
-	pthread_mutex_init(&g_peer_check, NULL);
+	sem_wait(g_last_word);
 	return (mtx);
 }
 
-int			main(int argc, char **argv)
+int				main(int argc, char **argv)
 {
 	t_arg		arg;
 	t_mtx		*mtx;
 	t_phil		*phil;
 
-	g_someone_dead = 0;
 	if (argc < 5 || argc > 6)
 		return (1);
 	arg = extract_arg(argv, argc == 6);
@@ -82,5 +92,7 @@ int			main(int argc, char **argv)
 		free(phil);
 		return (3);
 	}
+	free(phil);
+	free(mtx);
 	return (0);
 }

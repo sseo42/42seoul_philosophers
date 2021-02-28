@@ -5,44 +5,43 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: sseo <marvin@42.fr>                        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2021/02/28 16:09:21 by sseo              #+#    #+#             */
-/*   Updated: 2021/03/01 01:06:29 by sseo             ###   ########.fr       */
+/*   Created: 2021/02/28 16:47:13 by sseo              #+#    #+#             */
+/*   Updated: 2021/03/01 01:12:39 by sseo             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "philosopher.h"
 #include "philosopher_func.h"
 
-extern int				g_someone_dead;
-extern pthread_mutex_t	g_death_check;
+extern int		g_someone_dead;
+extern sem_t	*g_death_check;
+extern sem_t	*g_sema;
 
 static int		take_stick(t_phil *phil)
 {
+	if (get_usec() - phil->last_meal > phil->time_to_die)
+		return (1);
 	while (*(phil->my_status) != EATING)
 	{
 		usleep(50);
 		check_peer(phil);
 	}
-	if (get_usec() - phil->last_meal > phil->time_to_die)
-	{
-		return (1);
-	}
-	pthread_mutex_lock(phil->left);
+	sem_wait(g_sema);
 	if (get_usec() - phil->last_meal > phil->time_to_die)
 	{
 		*(phil->my_status) = SATISFIED;
-		pthread_mutex_unlock(phil->left);
+		sem_post(g_sema);
 		return (1);
 	}
 	print_status(get_usec(), phil->my_number, "has taken a Fork\n");
-	pthread_mutex_lock(phil->right);
+	sem_wait(g_sema);
 	return (0);
 }
 
 static int		drop_stick(t_phil *phil)
 {
-	pthread_mutex_unlock(phil->left);
-	pthread_mutex_unlock(phil->right);
+	sem_post(g_sema);
+	sem_post(g_sema);
 	*(phil->my_status) = SATISFIED;
 	return (0);
 }
@@ -79,18 +78,18 @@ static void		*wait_my_death(void *info)
 	phil = (t_phil *)info;
 	while (1)
 	{
-		pthread_mutex_lock(&g_death_check);
+		sem_wait(g_death_check);
 		if (g_someone_dead)
 			phil->last_meal = get_usec() - phil->time_to_die - 1;
 		if (get_usec() - phil->last_meal > phil->time_to_die)
 		{
 			if (phil->must_eat && !g_someone_dead)
 				print_status(get_usec(), phil->my_number, "died\n");
-			pthread_mutex_unlock(&g_death_check);
+			sem_post(g_death_check);
 			g_someone_dead = 1;
 			break ;
 		}
-		pthread_mutex_unlock(&g_death_check);
+		sem_post(g_death_check);
 	}
 	return (info);
 }

@@ -5,19 +5,20 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: sseo <marvin@42.fr>                        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2021/02/28 16:00:51 by sseo              #+#    #+#             */
-/*   Updated: 2021/02/28 16:00:52 by sseo             ###   ########.fr       */
+/*   Created: 2021/02/28 16:36:57 by sseo              #+#    #+#             */
+/*   Updated: 2021/03/01 01:12:47 by sseo             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "philosopher.h"
 #include "philosopher_func.h"
 
-int				g_someone_dead;
-pthread_mutex_t	g_death_check;
-pthread_mutex_t	g_peer_check;
+int			g_someone_dead;
+sem_t		*g_peer_check;
+sem_t		*g_death_check;
+sem_t		*g_sema;
 
-t_arg		extract_arg(char **argv, int option_flag)
+t_arg			extract_arg(char **argv, int option_flag)
 {
 	t_arg		arg;
 
@@ -38,32 +39,41 @@ t_arg		extract_arg(char **argv, int option_flag)
 	return (arg);
 }
 
-t_mtx		*init_mtx(long int number_of_phil)
+t_mtx			*init_mtx(long int number_of_phil)
 {
 	t_mtx		*mtx;
 	long int	idx;
 
+	g_someone_dead = 0;
+	sem_unlink(".Philosopher");
+	sem_unlink(".Philosopher_dead");
+	sem_unlink(".Philosopher_peer");
+	if ((g_sema = sem_open(".Philosopher", O_CREAT, 0644, number_of_phil)) \
+			== SEM_FAILED)
+		return (0);
+	if ((g_death_check = sem_open(".Philosopher_dead", O_CREAT, 0644, 1)) \
+			== SEM_FAILED)
+		return (0);
+	if ((g_peer_check = sem_open(".Philosopher_peer", O_CREAT, 0644, 1)) \
+			== SEM_FAILED)
+		return (0);
 	if (!(mtx = (t_mtx *)malloc(sizeof(t_mtx) * number_of_phil)))
 		return (0);
 	idx = 0;
 	while (idx < number_of_phil)
 	{
-		pthread_mutex_init(&(mtx[idx].stick), NULL);
 		mtx[idx].status = SATISFIED;
 		idx++;
 	}
-	pthread_mutex_init(&g_death_check, NULL);
-	pthread_mutex_init(&g_peer_check, NULL);
 	return (mtx);
 }
 
-int			main(int argc, char **argv)
+int				main(int argc, char **argv)
 {
 	t_arg		arg;
 	t_mtx		*mtx;
 	t_phil		*phil;
 
-	g_someone_dead = 0;
 	if (argc < 5 || argc > 6)
 		return (1);
 	arg = extract_arg(argv, argc == 6);
@@ -82,5 +92,7 @@ int			main(int argc, char **argv)
 		free(phil);
 		return (3);
 	}
-	return (0);
+	sem_close(g_sema);
+	sem_close(g_death_check);
+	sem_close(g_peer_check);
 }
